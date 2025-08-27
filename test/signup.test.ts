@@ -1,132 +1,211 @@
-import axios from "axios";
+import { AccountDAODatabase, AccountDAOMemory } from "../src/data";
+import GetAccount from "../src/getAccount";
+import Signup from "../src/signup";
+import sinon from "sinon";
 
-const baseDomainUrl = "http://localhost:3000";
-axios.defaults.validateStatus = () => true;
+let signup: Signup;
+let getAccount: GetAccount;
 
-test("Should create passenger account when inputs are valid", async function name() {
-   const input = {
-      name: "John Doe",
-      email: `email${Math.random()}@email.com`,
-      password: "asdQWE123",
-      cpf: "19119119100",
-      isPassenger: true,
-   }
-   const postAccountResponse = await axios.post(baseDomainUrl + "/signup", input);
-   const accountId = postAccountResponse.data.accountId;
-   const getAccountResponse = await axios.get(baseDomainUrl + `/accounts/${accountId}`);
-   const output = getAccountResponse.data;
-   expect(output.account_id).toBe(accountId);
-   expect(output.name).toBe(input.name);
-   expect(output.email).toBe(input.email);
-   expect(output.cpf).toBe(input.cpf);
-   expect(output.car_plate).toBeNull();
-   expect(output.is_passenger).toBe(input.isPassenger);
-   expect(output.is_driver).toBeFalsy();
-   expect(output.password).toBe(input.password);
+beforeEach(() => {
+    const accountDAO = new AccountDAODatabase();
+    // const accountDAO = new AccountDAOMemory();
+    signup = new Signup(accountDAO);
+    getAccount = new GetAccount(accountDAO);
 });
 
-test("Should create driver account when inputs are valid", async function name() {
-   const input = {
-      name: "John Doe",
-      email: `email${Math.random()}@email.com`,
-      password: "asdQWE123",
-      cpf: "19119119100",
-      isPassenger: false,
-      isDriver: true,
-      carPlate: "ABC1234"
-   }
-   const postAccountResponse = await axios.post(baseDomainUrl + "/signup", input);
-   const accountId = postAccountResponse.data.accountId;
-   const getAccountResponse = await axios.get(baseDomainUrl + `/accounts/${accountId}`);
-   const output = getAccountResponse.data;
-   expect(output.account_id).toBe(accountId);
-   expect(output.name).toBe(input.name);
-   expect(output.email).toBe(input.email);
-   expect(output.cpf).toBe(input.cpf);
-   expect(output.car_plate).toBe(input.carPlate);
-   expect(output.is_passenger).toBe(input.isPassenger);
-   expect(output.is_driver).toBe(input.isDriver);
-   expect(output.password).toBe(input.password);
+test("Deve fazer a criação da conta de um usuário do tipo passageiro", async function () {
+    const input = {
+        name: "John Doe",
+        email: `john.doe${Math.random()}@gmail.com`,
+        cpf: "97456321558",
+        password: "asdQWE123",
+        isPassenger: true
+    };
+    const outputSignup = await signup.execute(input);
+    expect(outputSignup.accountId).toBeDefined();
+    const outputGetAccount = await getAccount.execute(outputSignup.accountId);
+    expect(outputGetAccount.name).toBe(input.name);
+    expect(outputGetAccount.email).toBe(input.email);
+    expect(outputGetAccount.cpf).toBe(input.cpf);
+    expect(outputGetAccount.password).toBe(input.password);
 });
 
-test("Should not create account when cpf is invalid", async function () {
-   const input = {
-      name: "John Doe",
-      email: `email${Math.random()}@email.com`,
-      cpf: "111",
-      password: "asdQWE123",
-      isPassenger: true
-   };
-   const response = await axios.post(baseDomainUrl + "/signup", input);
-   const output = response.data;
-   expect(output.message).toBe("Invalid CPF");
+test("Deve fazer a criação da conta de um usuário do tipo motorista", async function () {
+    const input = {
+        name: "John Doe",
+        email: `john.doe${Math.random()}@gmail.com`,
+        cpf: "97456321558",
+        password: "asdQWE123",
+        carPlate: "AAA9999",
+        isDriver: true
+    };
+    const outputSignup = await signup.execute(input);
+    expect(outputSignup.accountId).toBeDefined();
+    const outputGetAccount = await getAccount.execute(outputSignup.accountId);
+    expect(outputGetAccount.name).toBe(input.name);
+    expect(outputGetAccount.email).toBe(input.email);
+    expect(outputGetAccount.cpf).toBe(input.cpf);
+    expect(outputGetAccount.password).toBe(input.password);
 });
 
-test("Should not create account when email is invalid", async function () {
-   const input = {
-      name: "John Doe",
-      email: `invalidEmail${Math.random()}`,
-      cpf: "97456321558",
-      password: "asdQWE123",
-      isPassenger: true
-   };
-   const response = await axios.post(baseDomainUrl + "/signup", input);
-   const output = response.data;
-   expect(output.message).toBe("Invalid email");
+test("Não deve fazer a criação da conta de um usuário se o nome for inválido", async function () {
+    const input = {
+        name: "John",
+        email: `john.doe${Math.random()}@gmail.com`,
+        cpf: "97456321558",
+        password: "asdQWE123",
+        isPassenger: true
+    };
+    await expect(() => signup.execute(input)).rejects.toThrow(new Error("Invalid name"));
 });
 
-test("Should not create account when name is invalid", async function () {
-   const input = {
-      name: "John",
-      email: `email${Math.random()}@email.com`,
-      cpf: "19119119100",
-      password: "asdQWE123",
-      isPassenger: true
-   };
-   const response = await axios.post(baseDomainUrl + "/signup", input);
-   const output = response.data;
-   expect(output.message).toBe("Invalid name");
+test("Não deve fazer a criação da conta de um usuário se o email for inválido", async function () {
+    const input = {
+        name: "John Doe",
+        email: `john.doe${Math.random()}`,
+        cpf: "97456321558",
+        password: "asdQWE123",
+        isPassenger: true
+    };
+    await expect(() => signup.execute(input)).rejects.toThrow(new Error("Invalid email"));
 });
 
-test("Should not create account when email is already registered", async function () {
-   const input = {
-      name: "John Doe",
-      email: `email${Math.random()}@email.com`,
-      cpf: "19119119100",
-      password: "asdQWE123",
-      isPassenger: true
-   };
-   await axios.post(baseDomainUrl + "/signup", input);
-   const secondResponse = await axios.post(baseDomainUrl + "/signup", input);
-   const output = secondResponse.data;
-   expect(output.message).toBe("Account already exists");
+test("Não deve fazer a criação da conta de um usuário se o cpf for inválido", async function () {
+    const input = {
+        name: "John Doe",
+        email: `john.doe${Math.random()}@gmail.com`,
+        cpf: "974563215",
+        password: "asdQWE123",
+        isPassenger: true
+    };
+    await expect(() => signup.execute(input)).rejects.toThrow(new Error("Invalid CPF"));
 });
 
-test("Should not create account when password is invalid", async function () {
-   const input = {
-      name: "John Doe",
-      email: `email${Math.random()}@email.com`,
-      cpf: "19119119100",
-      password: "111",
-      isPassenger: true
-   };
-   await axios.post(baseDomainUrl + "/signup", input);
-   const secondResponse = await axios.post(baseDomainUrl + "/signup", input);
-   const output = secondResponse.data;
-   expect(output.message).toBe("Invalid password");
+
+test("Não deve fazer a criação da conta de um usuário se o senha for inválida", async function () {
+    const input = {
+        name: "John Doe",
+        email: `john.doe${Math.random()}@gmail.com`,
+        cpf: "97456321558",
+        password: "asdQWE",
+        isPassenger: true
+    };
+    await expect(() => signup.execute(input)).rejects.toThrow(new Error("Invalid password"));
 });
 
-test("Should not create account when car plate is invalid", async function () {
-   const input = {
-      name: "John Doe",
-      email: `email${Math.random()}@email.com`,
-      cpf: "19119119100",
-      password: "asdQWE123",
-      isDriver: true,
-      carPlate: "123"
-   };
-   await axios.post(baseDomainUrl + "/signup", input);
-   const secondResponse = await axios.post(baseDomainUrl + "/signup", input);
-   const output = secondResponse.data;
-   expect(output.message).toBe("Invalid car plate");
+test("Não deve fazer a criação da conta de um usuário se a conta estiver duplicada", async function () {
+    const input = {
+        name: "John Doe",
+        email: `john.doe${Math.random()}@gmail.com`,
+        cpf: "97456321558",
+        password: "asdQWE123",
+        isPassenger: true
+    };
+    await signup.execute(input);
+    await expect(() => signup.execute(input)).rejects.toThrow(new Error("Account already exists"));
+});
+
+test("Não deve fazer a criação da conta de um usuário se a placa for inválida", async function () {
+    const input = {
+        name: "John Doe",
+        email: `john.doe${Math.random()}@gmail.com`,
+        cpf: "97456321558",
+        password: "asdQWE123",
+        carPlate: "AAA999",
+        isDriver: true
+    };
+    await expect(() => signup.execute(input)).rejects.toThrow(new Error("Invalid car plate"));
+});
+
+
+// Test Patterns
+
+
+test("Deve fazer a criação da conta de um usuário do tipo passageiro com stub", async function () {
+    const input = {
+        name: "John Doe",
+        email: `john.doe${Math.random()}@gmail.com`,
+        cpf: "97456321558",
+        password: "asdQWE123",
+        isPassenger: true
+    };
+    const saveAccountStub = sinon.stub(AccountDAODatabase.prototype, "saveAccount").resolves();
+    const getAccountByEmailStub = sinon.stub(AccountDAODatabase.prototype, "getAccountByEmail").resolves();
+    const getAccountById = sinon.stub(AccountDAODatabase.prototype, "getAccountById").resolves(input);
+    const outputSignup = await signup.execute(input);
+    expect(outputSignup.accountId).toBeDefined();
+    const outputGetAccount = await getAccount.execute(outputSignup.accountId);
+    expect(outputGetAccount.name).toBe(input.name);
+    expect(outputGetAccount.email).toBe(input.email);
+    expect(outputGetAccount.cpf).toBe(input.cpf);
+    expect(outputGetAccount.password).toBe(input.password);
+    saveAccountStub.restore();
+    getAccountByEmailStub.restore();
+    getAccountById.restore();
+});
+
+test("Deve fazer a criação da conta de um usuário do tipo passageiro com spy", async function () {
+    const saveAccountSpy = sinon.spy(AccountDAODatabase.prototype, "saveAccount");
+    const getAccountByIdSpy = sinon.spy(AccountDAODatabase.prototype, "getAccountById");
+    const input = {
+        name: "John Doe",
+        email: `john.doe${Math.random()}@gmail.com`,
+        cpf: "97456321558",
+        password: "asdQWE123",
+        isPassenger: true
+    };
+    const outputSignup = await signup.execute(input);
+    expect(outputSignup.accountId).toBeDefined();
+    const outputGetAccount = await getAccount.execute(outputSignup.accountId);
+    expect(outputGetAccount.name).toBe(input.name);
+    expect(outputGetAccount.email).toBe(input.email);
+    expect(outputGetAccount.cpf).toBe(input.cpf);
+    expect(outputGetAccount.password).toBe(input.password);
+    expect(saveAccountSpy.calledOnce).toBe(true);
+    expect(getAccountByIdSpy.calledWith(outputSignup.accountId)).toBe(true);
+    saveAccountSpy.restore();
+    getAccountByIdSpy.restore();
+});
+
+test("Deve fazer a criação da conta de um usuário do tipo passageiro com mock", async function () {
+    const input = {
+        name: "John Doe",
+        email: `john.doe${Math.random()}@gmail.com`,
+        cpf: "97456321558",
+        password: "asdQWE123",
+        isPassenger: true
+    };
+    const accountDAOMock = sinon.mock(AccountDAODatabase.prototype);
+    accountDAOMock.expects("saveAccount").once().resolves();
+    accountDAOMock.expects("getAccountByEmail").once().resolves();
+    const outputSignup = await signup.execute(input);
+    expect(outputSignup.accountId).toBeDefined();
+    accountDAOMock.expects("getAccountById").once().withArgs(outputSignup.accountId).resolves(input);
+    const outputGetAccount = await getAccount.execute(outputSignup.accountId);
+    expect(outputGetAccount.name).toBe(input.name);
+    expect(outputGetAccount.email).toBe(input.email);
+    expect(outputGetAccount.cpf).toBe(input.cpf);
+    expect(outputGetAccount.password).toBe(input.password);
+    accountDAOMock.verify();
+    accountDAOMock.restore();
+});
+
+test.only("Deve fazer a criação da conta de um usuário do tipo passageiro com fake", async function () {
+    const accountDAO = new AccountDAOMemory();
+    signup = new Signup(accountDAO);
+    getAccount = new GetAccount(accountDAO);
+    const input = {
+        name: "John Doe",
+        email: `john.doe${Math.random()}@gmail.com`,
+        cpf: "97456321558",
+        password: "asdQWE123",
+        isPassenger: true
+    };
+    const outputSignup = await signup.execute(input);
+    expect(outputSignup.accountId).toBeDefined();
+    const outputGetAccount = await getAccount.execute(outputSignup.accountId);
+    expect(outputGetAccount.name).toBe(input.name);
+    expect(outputGetAccount.email).toBe(input.email);
+    expect(outputGetAccount.cpf).toBe(input.cpf);
+    expect(outputGetAccount.password).toBe(input.password);
 });
